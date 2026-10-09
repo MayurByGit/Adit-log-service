@@ -1,5 +1,5 @@
 
-        package com.example.audit.service;
+package com.example.audit.service;
 
 import org.springframework.stereotype.Service;
 
@@ -13,8 +13,11 @@ import java.util.HexFormat;
 @Service
 public class HashChainService {
 
-    private static final String GENESIS_VALUE =
-            "AUDIT_LOG_GENESIS_V1";
+    private static final String GENESIS_VALUE = "AUDIT_LOG_GENESIS_V1";
+
+    public String getGenesisHash() {
+        return sha256(GENESIS_VALUE);
+    }
 
     public String calculateHash(
             Long sequenceNumber,
@@ -31,26 +34,21 @@ public class HashChainService {
                     "Sequence number and timestamp are required");
         }
 
-        // Use microsecond precision consistently.
         Instant normalizedTimestamp =
                 timestamp.truncatedTo(ChronoUnit.MICROS);
 
-        StringBuilder content = new StringBuilder();
+        StringBuilder canonical = new StringBuilder();
 
-        appendField(content, sequenceNumber.toString());
-        appendField(content, eventType);
-        appendField(content, actorId);
-        appendField(content, resourceType);
-        appendField(content, resourceId);
-        appendField(content, payload);
-        appendField(content, normalizedTimestamp.toString());
-        appendField(content, previousHash);
+        appendField(canonical, sequenceNumber.toString());
+        appendField(canonical, eventType);
+        appendField(canonical, actorId);
+        appendField(canonical, resourceType);
+        appendField(canonical, resourceId);
+        appendField(canonical, payload);
+        appendField(canonical, normalizedTimestamp.toString());
+        appendField(canonical, previousHash);
 
-        return sha256(content.toString());
-    }
-
-    public String getGenesisHash() {
-        return sha256(GENESIS_VALUE);
+        return sha256(canonical.toString());
     }
 
     private void appendField(StringBuilder target, String value) {
@@ -65,17 +63,13 @@ public class HashChainService {
 
     private String sha256(String value) {
         try {
-            MessageDigest digest =
-                    MessageDigest.getInstance("SHA-256");
-
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(
                     value.getBytes(StandardCharsets.UTF_8));
-
             return HexFormat.of().formatHex(hash);
-
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException(
-                    "SHA-256 algorithm is unavailable", exception);
+                    "SHA-256 is unavailable", exception);
         }
     }
 }

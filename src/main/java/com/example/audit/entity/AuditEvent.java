@@ -126,10 +126,10 @@ public class AuditEvent {
     public String getEventHash() {
         return eventHash;
     }
+
     public String getRedactedPayload() {
         return redactedPayload;
     }
-
 
 
     public void setRedactedPayload(String redactedPayload) {
@@ -139,6 +139,7 @@ public class AuditEvent {
     public void markArchived() {
         this.archived = true;
     }
+
     public boolean isArchived() {
         return archived;
     }
@@ -151,4 +152,6 @@ public class AuditEvent {
         this.archived = true;
         this.archivedAt = archivedAt;
     }
+
 }
+

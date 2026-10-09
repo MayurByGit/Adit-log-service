@@ -13,9 +13,12 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 @Service
 public class AuditService {
+
+    private static final Long CHAIN_STATE_ID = 1L;
 
     private final AuditEventRepository repository;
     private final AuditChainStateRepository stateRepository;
@@ -37,16 +40,19 @@ public class AuditService {
     public AuditEventResponse create(CreateAuditEventRequest request) {
         try {
             AuditChainState state = stateRepository
-                    .findByIdForUpdate(1L)
+                    .findByIdForUpdate(CHAIN_STATE_ID)
                     .orElseThrow(() -> new IllegalStateException(
                             "Audit chain state is not initialized"));
 
             String payloadJson =
                     objectMapper.writeValueAsString(request.payload());
 
-            long sequence = state.getLatestSequence() + 1;
+            long sequence = state.getLatestSequence() + 1L;
             String previousHash = state.getLatestHash();
-            Instant timestamp = Instant.now();
+
+            // Normalize before hashing AND storing.
+            Instant timestamp =
+                    Instant.now().truncatedTo(ChronoUnit.MICROS);
 
             String eventHash = hashChainService.calculateHash(
                     sequence,
@@ -56,8 +62,7 @@ public class AuditService {
                     request.resourceId(),
                     payloadJson,
                     timestamp,
-                    previousHash
-            );
+                    previousHash);
 
             AuditEvent event = new AuditEvent(
                     sequence,
@@ -68,8 +73,7 @@ public class AuditService {
                     payloadJson,
                     timestamp,
                     previousHash,
-                    eventHash
-            );
+                    eventHash);
 
             AuditEvent saved = repository.saveAndFlush(event);
 
@@ -89,8 +93,7 @@ public class AuditService {
                     payload,
                     saved.getTimestamp(),
                     saved.getPreviousHash(),
-                    saved.getEventHash()
-            );
+                    saved.getEventHash());
 
         } catch (Exception ex) {
             throw new IllegalStateException(

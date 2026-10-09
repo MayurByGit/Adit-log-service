@@ -1,5 +1,5 @@
 
-        package com.example.audit.service;
+package com.example.audit.service;
 
 import com.example.audit.dto.VerificationResponse;
 import com.example.audit.entity.AuditChainState;
@@ -13,6 +13,8 @@ import java.util.List;
 
 @Service
 public class VerificationService {
+
+    private static final Long CHAIN_STATE_ID = 1L;
 
     private final AuditEventRepository eventRepository;
     private final AuditChainStateRepository stateRepository;
@@ -29,57 +31,61 @@ public class VerificationService {
 
     @Transactional(readOnly = true)
     public VerificationResponse verify() {
-
-        AuditChainState state = stateRepository.findById(1L)
-                .orElse(null);
-
-        if (state == null) {
-            return invalid(
-                    null,
-                    "CHAIN_STATE_MISSING",
-                    "Audit chain state was not found");
-        }
-
         List<AuditEvent> events =
                 eventRepository.findAllByOrderBySequenceNumberAsc();
 
+        AuditChainState checkpoint =
+                stateRepository.findById(CHAIN_STATE_ID).orElse(null);
+
+        if (events.isEmpty()) {
+            if (checkpoint != null
+                    && (checkpoint.getLatestSequence() != 0L
+                    || !hashChainService.getGenesisHash()
+                    .equals(checkpoint.getLatestHash()))) {
+                return invalid(
+                        null,
+                        "CHECKPOINT_MISMATCH",
+                        "Checkpoint is inconsistent with an empty chain");
+            }
+
+            return new VerificationResponse(
+                    true, null, null, "Audit chain is intact");
+        }
+
         long expectedSequence = 1L;
-        String expectedPreviousHash =
-                hashChainService.getGenesisHash();
+        String expectedPreviousHash = hashChainService.getGenesisHash();
 
         for (AuditEvent event : events) {
+            Long actualSequence = event.getSequenceNumber();
 
-            if (event.getSequenceNumber() == null
-                    || event.getSequenceNumber() != expectedSequence) {
+            if (actualSequence == null
+                    || actualSequence != expectedSequence) {
                 return invalid(
-                        expectedSequence,
-                        "SEQUENCE_GAP",
-                        "Unexpected audit event sequence");
+                        actualSequence,
+                        "SEQUENCE_MISMATCH",
+                        "Audit event sequence is missing or out of order");
             }
 
-            if (!expectedPreviousHash.equals(
-                    event.getPreviousHash())) {
+            if (!expectedPreviousHash.equals(event.getPreviousHash())) {
                 return invalid(
-                        event.getSequenceNumber(),
+                        actualSequence,
                         "PREVIOUS_HASH_MISMATCH",
-                        "Previous hash does not match the preceding event");
+                        "Event previous hash does not match the preceding hash");
             }
 
-            String calculatedHash =
-                    hashChainService.calculateHash(
-                            event.getSequenceNumber(),
-                            event.getEventType(),
-                            event.getActorId(),
-                            event.getResourceType(),
-                            event.getResourceId(),
-                            event.getPayload(),
-                            event.getTimestamp(),
-                            event.getPreviousHash()
-                    );
+            String calculatedHash = hashChainService.calculateHash(
+                    event.getSequenceNumber(),
+                    event.getEventType(),
+                    event.getActorId(),
+                    event.getResourceType(),
+                    event.getResourceId(),
+                    event.getPayload(),
+                    event.getTimestamp(),
+                    event.getPreviousHash());
 
             if (!calculatedHash.equals(event.getEventHash())) {
                 return invalid(
-                        event.getSequenceNumber(),
+                        actualSequence,
                         "EVENT_HASH_MISMATCH",
                         "Stored event content does not match its hash");
             }
@@ -88,41 +94,29 @@ public class VerificationService {
             expectedSequence++;
         }
 
-        long actualLastSequence = expectedSequence - 1;
+        AuditEvent lastEvent = events.get(events.size() - 1);
 
-        if (!Long.valueOf(actualLastSequence).equals(
-                state.getLatestSequence())) {
+        if (checkpoint == null
+                || checkpoint.getLatestSequence() == null
+                || checkpoint.getLatestSequence()
+                != lastEvent.getSequenceNumber()
+                || !lastEvent.getEventHash()
+                .equals(checkpoint.getLatestHash())) {
             return invalid(
-                    null,
-                    "CHECKPOINT_SEQUENCE_MISMATCH",
-                    "Chain checkpoint sequence does not match the events");
-        }
-
-        if (!expectedPreviousHash.equals(state.getLatestHash())) {
-            return invalid(
-                    null,
-                    "CHECKPOINT_HASH_MISMATCH",
-                    "Chain checkpoint hash does not match the events");
+                    lastEvent.getSequenceNumber(),
+                    "CHECKPOINT_MISMATCH",
+                    "Chain checkpoint does not match the last event");
         }
 
         return new VerificationResponse(
-                true,
-                null,
-                null,
-                "Audit chain is intact"
-        );
+                true, null, null, "Audit chain is intact");
     }
 
     private VerificationResponse invalid(
             Long sequence,
             String violationType,
             String message) {
-
         return new VerificationResponse(
-                false,
-                sequence,
-                violationType,
-                message
-        );
+                false, sequence, violationType, message);
     }
 }

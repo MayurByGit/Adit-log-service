@@ -1,16 +1,16 @@
+
 package com.example.audit.service;
 
 import com.example.audit.dto.ComplianceReportResponse;
+import com.example.audit.dto.VerificationResponse;
 import com.example.audit.entity.AuditEvent;
 import com.example.audit.repository.AuditEventRepository;
-import com.example.audit.dto.VerificationResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
@@ -23,6 +23,7 @@ public class ComplianceReportService {
     public ComplianceReportService(
             AuditEventRepository auditEventRepository,
             VerificationService verificationService) {
+
         this.auditEventRepository = auditEventRepository;
         this.verificationService = verificationService;
     }
@@ -36,67 +37,74 @@ public class ComplianceReportService {
 
         validateTimeRange(startTime, endTime);
 
-        List<AuditEvent> matchingEvents =
-                auditEventRepository.findAllByOrderBySequenceNumberAsc()
+        String actorFilter = normalize(actorId);
+        String typeFilter = normalize(eventType);
+
+        List<AuditEvent> events =
+                auditEventRepository
+                        .findAllByOrderBySequenceNumberAsc()
                         .stream()
+                        .filter(event -> {
+                            Instant timestamp = event.getTimestamp();
+                            return timestamp != null
+                                    && !timestamp.isBefore(startTime)
+                                    && !timestamp.isAfter(endTime);
+                        })
                         .filter(event ->
-                                !event.getTimestamp().isBefore(startTime)
-                                        && !event.getTimestamp().isAfter(endTime))
+                                actorFilter == null
+                                        || actorFilter.equals(
+                                        event.getActorId()))
                         .filter(event ->
-                                actorId == null
-                                        || actorId.isBlank()
-                                        || actorId.equals(event.getActorId()))
-                        .filter(event ->
-                                eventType == null
-                                        || eventType.isBlank()
-                                        || eventType.equalsIgnoreCase(
-                                        event.getEventType()))
+                                typeFilter == null
+                                        || (event.getEventType() != null
+                                        && typeFilter.equalsIgnoreCase(
+                                        event.getEventType())))
                         .toList();
 
         Map<String, Long> eventTypeCounts =
-                matchingEvents.stream()
+                events.stream()
                         .collect(Collectors.groupingBy(
                                 AuditEvent::getEventType,
                                 TreeMap::new,
                                 Collectors.counting()));
 
         Map<String, Long> actorCounts =
-                matchingEvents.stream()
+                events.stream()
                         .collect(Collectors.groupingBy(
                                 AuditEvent::getActorId,
                                 TreeMap::new,
                                 Collectors.counting()));
 
-        long archivedEvents = matchingEvents.stream()
+        long archivedCount = events.stream()
                 .filter(AuditEvent::isArchived)
                 .count();
 
-        VerificationResponse verification = verificationService.verify();
-
-        List<ComplianceReportResponse.EventSummary> summaries =
-                matchingEvents.stream()
-                        .map(this::toSummary)
-                        .toList();
+        VerificationResponse verification =
+                verificationService.verify();
 
         return new ComplianceReportResponse(
                 Instant.now(),
                 startTime,
                 endTime,
-                normalizeFilter(actorId),
-                normalizeFilter(eventType),
-                matchingEvents.size(),
-                archivedEvents,
+                actorFilter,
+                typeFilter,
+                events.size(),
+                archivedCount,
                 eventTypeCounts,
                 actorCounts,
                 verification.valid(),
-                verification.message(),
-                summaries
+                verification.message()
         );
     }
 
-    private void validateTimeRange(Instant startTime, Instant endTime) {
-        Objects.requireNonNull(startTime, "startTime is required");
-        Objects.requireNonNull(endTime, "endTime is required");
+    private void validateTimeRange(
+            Instant startTime,
+            Instant endTime) {
+
+        if (startTime == null || endTime == null) {
+            throw new IllegalArgumentException(
+                    "startTime and endTime are required");
+        }
 
         if (startTime.isAfter(endTime)) {
             throw new IllegalArgumentException(
@@ -104,20 +112,10 @@ public class ComplianceReportService {
         }
     }
 
-    private String normalizeFilter(String value) {
-        return value == null || value.isBlank() ? null : value;
-    }
-
-    private ComplianceReportResponse.EventSummary toSummary(
-            AuditEvent event) {
-        return new ComplianceReportResponse.EventSummary(
-                event.getSequenceNumber(),
-                event.getEventType(),
-                event.getActorId(),
-                event.getResourceType(),
-                event.getResourceId(),
-                event.getTimestamp(),
-                event.isArchived()
-        );
+    private String normalize(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 }

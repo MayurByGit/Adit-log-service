@@ -1,7 +1,7 @@
+
 package com.example.audit.dto;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.Map;
 
 public record ComplianceReportResponse(
@@ -15,17 +15,6 @@ public record ComplianceReportResponse(
         Map<String, Long> eventTypeCounts,
         Map<String, Long> actorCounts,
         boolean integrityVerified,
-        String integrityMessage,
-        List<EventSummary> events
+        String integrityMessage
 ) {
-    public record EventSummary(
-            Long sequenceNumber,
-            String eventType,
-            String actorId,
-            String resourceType,
-            String resourceId,
-            Instant timestamp,
-            boolean archived
-    ) {
-    }
 }

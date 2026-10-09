@@ -1,4 +1,6 @@
+
 package com.example.audit.service;
+
 import com.example.audit.dto.AuditEventResponse;
 import com.example.audit.dto.AuditExportResponse;
 import com.example.audit.dto.VerificationResponse;
@@ -8,17 +10,39 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 @Service
 public class AuditArchiveService {
+
+    private static final int MIN_RETENTION_DAYS = 1;
+    private static final int MAX_RETENTION_DAYS = 36500;
+
+    private static final Set<String> SENSITIVE_FIELDS = Set.of(
+            "password",
+            "passwd",
+            "secret",
+            "clientsecret",
+            "token",
+            "accesstoken",
+            "refreshtoken",
+            "email",
+            "phone",
+            "phonenumber",
+            "ssn",
+            "socialsecurity",
+            "creditcard",
+            "cardnumber",
+            "accountnumber"
+    );
 
     private final AuditEventRepository repository;
     private final VerificationService verificationService;
@@ -33,63 +57,57 @@ public class AuditArchiveService {
         this.objectMapper = objectMapper;
     }
 
+    /**
+     * Marks unarchived events older than the retention cutoff.
+     * Events are retained so their hash-chain history remains available.
+     */
     @Transactional
     public int archiveOlderThanDays(int retentionDays) {
-        if (retentionDays < 1 || retentionDays > 36500) {
-            throw new IllegalArgumentException(
-                    "retentionDays must be between 1 and 36500");
-        }
+        validateRetentionDays(retentionDays);
 
         Instant cutoff = Instant.now()
                 .minus(retentionDays, ChronoUnit.DAYS);
 
-        List<AuditEvent> expiredEvents =
+        List<AuditEvent> candidates =
                 repository.findByTimestampBeforeAndArchivedFalse(cutoff);
+
+        if (candidates.isEmpty()) {
+            return 0;
+        }
 
         Instant archivedAt = Instant.now();
 
-        for (AuditEvent event : expiredEvents) {
+        for (AuditEvent event : candidates) {
             event.markArchived(archivedAt);
         }
 
-        repository.saveAll(expiredEvents);
-        return expiredEvents.size();
+        repository.saveAllAndFlush(candidates);
+
+        return candidates.size();
     }
 
+    /**
+     * Exports all events in sequence order.
+     * Redaction affects only the exported payload representation.
+     */
     @Transactional(readOnly = true)
-    public AuditExportResponse exportEvents(boolean redactSensitiveData) {
+    public AuditExportResponse exportEvents(
+            boolean redactSensitiveData) {
+
         VerificationResponse verification = verificationService.verify();
 
-        List<AuditEvent> allEvents =
+        List<AuditEvent> storedEvents =
                 repository.findAllByOrderBySequenceNumberAsc();
 
-        List<AuditEventResponse> exportedEvents = new ArrayList<>();
-        int archivedCount = 0;
+        int archivedCount = (int) storedEvents.stream()
+                .filter(AuditEvent::isArchived)
+                .count();
 
-        for (AuditEvent event : allEvents) {
-            if (event.isArchived()) {
-                archivedCount++;
-            }
-
-            JsonNode payload = parsePayload(event.getPayload());
-
-            if (redactSensitiveData) {
-                payload = redactPayload(payload);
-            }
-
-            exportedEvents.add(new AuditEventResponse(
-                    event.getId(),
-                    event.getSequenceNumber(),
-                    event.getEventType(),
-                    event.getActorId(),
-                    event.getResourceType(),
-                    event.getResourceId(),
-                    payload,
-                    event.getTimestamp(),
-                    event.getPreviousHash(),
-                    event.getEventHash()
-            ));
-        }
+        List<AuditEventResponse> exportedEvents =
+                storedEvents.stream()
+                        .map(event -> toResponse(
+                                event, redactSensitiveData))
+                        .toList();
 
         return new AuditExportResponse(
                 Instant.now(),
@@ -101,24 +119,49 @@ public class AuditArchiveService {
         );
     }
 
-    public JsonNode redactPayload(JsonNode original) {
-        if (original == null) {
-            return null;
+    private AuditEventResponse toResponse(
+            AuditEvent event,
+            boolean redactSensitiveData) {
+
+        JsonNode payload = readPayload(event.getPayload());
+
+        if (redactSensitiveData) {
+            payload = redactPayload(payload);
         }
 
+        return new AuditEventResponse(
+                event.getId(),
+                event.getSequenceNumber(),
+                event.getEventType(),
+                event.getActorId(),
+                event.getResourceType(),
+                event.getResourceId(),
+                payload,
+                event.getTimestamp(),
+                event.getPreviousHash(),
+                event.getEventHash()
+        );
+    }
+
+    private JsonNode readPayload(String payload) {
+        try {
+            return objectMapper.readTree(payload);
+        } catch (Exception exception) {
+            throw new IllegalStateException(
+                    "Unable to parse stored audit payload", exception);
+        }
+    }
+
+    private JsonNode redactPayload(JsonNode original) {
+        // Never modify the original payload object.
         JsonNode copy = original.deepCopy();
         redactRecursively(copy);
         return copy;
     }
 
     private void redactRecursively(JsonNode node) {
-        if (node == null) {
-            return;
-        }
-
         if (node instanceof ObjectNode objectNode) {
-
-            // Jackson 3: propertyNames() returns a Set<String>
+            // Jackson 3 propertyNames() returns a Set, not an Iterator.
             List<String> fieldNames =
                     new ArrayList<>(objectNode.propertyNames());
 
@@ -127,45 +170,46 @@ public class AuditArchiveService {
 
                 if (isSensitiveField(fieldName)) {
                     objectNode.put(fieldName, "[REDACTED]");
-                } else {
+                } else if (value != null) {
                     redactRecursively(value);
                 }
             }
-
-        } else if (node.isArray()) {
-            for (JsonNode child : node) {
-                redactRecursively(child);
+        } else if (node instanceof ArrayNode arrayNode) {
+            for (int index = 0; index < arrayNode.size(); index++) {
+                JsonNode child = arrayNode.get(index);
+                if (child != null) {
+                    redactRecursively(child);
+                }
             }
         }
     }
 
-
-
-
-
     private boolean isSensitiveField(String fieldName) {
         String normalized = fieldName
-                .replaceAll("[^a-zA-Z0-9]", "")
+                .replaceAll("[^A-Za-z0-9]", "")
                 .toLowerCase(Locale.ROOT);
+
+        if (SENSITIVE_FIELDS.contains(normalized)) {
+            return true;
+        }
 
         return normalized.contains("password")
                 || normalized.contains("secret")
                 || normalized.contains("token")
                 || normalized.contains("email")
                 || normalized.contains("phone")
-                || normalized.contains("ssn")
                 || normalized.contains("socialsecurity")
                 || normalized.contains("creditcard")
                 || normalized.contains("accountnumber");
     }
 
-    private JsonNode parsePayload(String payload) {
-        try {
-            return objectMapper.readTree(payload);
-        } catch (Exception exception) {
-            throw new IllegalStateException(
-                    "Could not parse audit event payload",
-                    exception);
+    private void validateRetentionDays(int retentionDays) {
+        if (retentionDays < MIN_RETENTION_DAYS
+                || retentionDays > MAX_RETENTION_DAYS) {
+            throw new IllegalArgumentException(
+                    "retentionDays must be between "
+                            + MIN_RETENTION_DAYS + " and "
+                            + MAX_RETENTION_DAYS);
         }
     }
 }

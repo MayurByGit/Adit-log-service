@@ -1,6 +1,10 @@
+
 package com.example.audit.entity;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "audit_chain_state")
@@ -16,10 +20,13 @@ public class AuditChainState {
     private String latestHash;
 
     protected AuditChainState() {
+        // Required by Hibernate.
     }
 
     public AuditChainState(
-            Long id, Long latestSequence, String latestHash) {
+            Long id,
+            Long latestSequence,
+            String latestHash) {
         this.id = id;
         this.latestSequence = latestSequence;
         this.latestHash = latestHash;
