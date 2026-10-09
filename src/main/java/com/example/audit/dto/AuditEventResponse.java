@@ -12,5 +12,7 @@ public record AuditEventResponse(
         String resourceType,
         String resourceId,
         JsonNode payload,
-        Instant timestamp
+        Instant timestamp,
+        String previousHash,
+        String eventHash
 ) {}

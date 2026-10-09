@@ -1,17 +1,22 @@
 
-package com.example.audit.entity;
+        package com.example.audit.entity;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+
 import java.time.Instant;
+
 
 @Entity
 @Table(
         name = "audit_event",
         uniqueConstraints = {
-                @UniqueConstraint(
-                        name = "uk_audit_event_sequence",
-                        columnNames = "sequence_number"
-                )
+                @UniqueConstraint(columnNames = "sequence_number")
         }
 )
 public class AuditEvent {
@@ -20,7 +25,7 @@ public class AuditEvent {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "sequence_number", nullable = false)
+    @Column(name = "sequence_number", nullable = false, unique = true)
     private Long sequenceNumber;
 
     @Column(name = "event_type", nullable = false, length = 100)
@@ -41,6 +46,22 @@ public class AuditEvent {
     @Column(name = "event_timestamp", nullable = false)
     private Instant timestamp;
 
+    @Column(name = "previous_hash", nullable = false, length = 64)
+    private String previousHash;
+
+    @Column(name = "event_hash", nullable = false, length = 64)
+    private String eventHash;
+
+    @Column(name = "redacted_payload", columnDefinition = "CLOB")
+    private String redactedPayload;
+
+    @Column(name = "archived", nullable = false)
+    private boolean archived = false;
+
+    @Column(name = "archived_at")
+    private Instant archivedAt;
+
+    // Required by Hibernate
     protected AuditEvent() {
     }
 
@@ -51,7 +72,10 @@ public class AuditEvent {
             String resourceType,
             String resourceId,
             String payload,
-            Instant timestamp) {
+            Instant timestamp,
+            String previousHash,
+            String eventHash) {
+
         this.sequenceNumber = sequenceNumber;
         this.eventType = eventType;
         this.actorId = actorId;
@@ -59,6 +83,8 @@ public class AuditEvent {
         this.resourceId = resourceId;
         this.payload = payload;
         this.timestamp = timestamp;
+        this.previousHash = previousHash;
+        this.eventHash = eventHash;
     }
 
     public Long getId() {
@@ -91,5 +117,38 @@ public class AuditEvent {
 
     public Instant getTimestamp() {
         return timestamp;
+    }
+
+    public String getPreviousHash() {
+        return previousHash;
+    }
+
+    public String getEventHash() {
+        return eventHash;
+    }
+    public String getRedactedPayload() {
+        return redactedPayload;
+    }
+
+
+
+    public void setRedactedPayload(String redactedPayload) {
+        this.redactedPayload = redactedPayload;
+    }
+
+    public void markArchived() {
+        this.archived = true;
+    }
+    public boolean isArchived() {
+        return archived;
+    }
+
+    public Instant getArchivedAt() {
+        return archivedAt;
+    }
+
+    public void markArchived(Instant archivedAt) {
+        this.archived = true;
+        this.archivedAt = archivedAt;
     }
 }

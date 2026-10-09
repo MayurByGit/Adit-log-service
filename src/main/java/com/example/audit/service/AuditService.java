@@ -3,12 +3,14 @@ package com.example.audit.service;
 
 import com.example.audit.dto.AuditEventResponse;
 import com.example.audit.dto.CreateAuditEventRequest;
+import com.example.audit.entity.AuditChainState;
 import com.example.audit.entity.AuditEvent;
+import com.example.audit.repository.AuditChainStateRepository;
 import com.example.audit.repository.AuditEventRepository;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.json.JsonMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
 
@@ -16,45 +18,83 @@ import java.time.Instant;
 public class AuditService {
 
     private final AuditEventRepository repository;
-    private final JsonMapper jsonMapper;
+    private final AuditChainStateRepository stateRepository;
+    private final HashChainService hashChainService;
+    private final ObjectMapper objectMapper;
 
     public AuditService(
             AuditEventRepository repository,
-            JsonMapper jsonMapper) {
+            AuditChainStateRepository stateRepository,
+            HashChainService hashChainService,
+            ObjectMapper objectMapper) {
         this.repository = repository;
-        this.jsonMapper = jsonMapper;
+        this.stateRepository = stateRepository;
+        this.hashChainService = hashChainService;
+        this.objectMapper = objectMapper;
     }
 
     @Transactional
     public AuditEventResponse create(CreateAuditEventRequest request) {
-        String payloadJson =
-                jsonMapper.writeValueAsString(request.payload());
+        try {
+            AuditChainState state = stateRepository
+                    .findByIdForUpdate(1L)
+                    .orElseThrow(() -> new IllegalStateException(
+                            "Audit chain state is not initialized"));
 
-        long sequence = repository.count() + 1;
+            String payloadJson =
+                    objectMapper.writeValueAsString(request.payload());
 
-        AuditEvent event = new AuditEvent(
-                sequence,
-                request.eventType(),
-                request.actorId(),
-                request.resourceType(),
-                request.resourceId(),
-                payloadJson,
-                Instant.now()
-        );
+            long sequence = state.getLatestSequence() + 1;
+            String previousHash = state.getLatestHash();
+            Instant timestamp = Instant.now();
 
-        AuditEvent saved = repository.saveAndFlush(event);
+            String eventHash = hashChainService.calculateHash(
+                    sequence,
+                    request.eventType(),
+                    request.actorId(),
+                    request.resourceType(),
+                    request.resourceId(),
+                    payloadJson,
+                    timestamp,
+                    previousHash
+            );
 
-        JsonNode payload = jsonMapper.readTree(saved.getPayload());
+            AuditEvent event = new AuditEvent(
+                    sequence,
+                    request.eventType(),
+                    request.actorId(),
+                    request.resourceType(),
+                    request.resourceId(),
+                    payloadJson,
+                    timestamp,
+                    previousHash,
+                    eventHash
+            );
 
-        return new AuditEventResponse(
-                saved.getId(),
-                saved.getSequenceNumber(),
-                saved.getEventType(),
-                saved.getActorId(),
-                saved.getResourceType(),
-                saved.getResourceId(),
-                payload,
-                saved.getTimestamp()
-        );
+            AuditEvent saved = repository.saveAndFlush(event);
+
+            state.update(sequence, eventHash);
+            stateRepository.saveAndFlush(state);
+
+            JsonNode payload =
+                    objectMapper.readTree(saved.getPayload());
+
+            return new AuditEventResponse(
+                    saved.getId(),
+                    saved.getSequenceNumber(),
+                    saved.getEventType(),
+                    saved.getActorId(),
+                    saved.getResourceType(),
+                    saved.getResourceId(),
+                    payload,
+                    saved.getTimestamp(),
+                    saved.getPreviousHash(),
+                    saved.getEventHash()
+            );
+
+        } catch (Exception ex) {
+            throw new IllegalStateException(
+                    "Unable to create audit event", ex);
+        }
     }
 }
