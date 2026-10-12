@@ -33,28 +33,36 @@ for local development and tests.
 
 ## Validation record
 
-Complete this section from actual test output:
+- **Date tested:** 12-10-2026
+- **Command executed:** `mvn clean test`
+- **Build result:** `BUILD SUCCESS`
+- **Total tests:** 19
+- **Passed:** 19
+- **Failed:** 0
+- **Errors:** 0
+- **Skipped:** 0
+- **Application startup result:** Yes
+- **Endpoints verified manually:** Yes
+- **Known failures or untested paths:** No
 
-- Date tested:
-- Command executed:
-- Total tests:
-- Passed:
-- Failed:
-- Errors:
-- Application startup result:
-- Endpoints verified manually:
-- Known failures or untested paths:
+The build result and automated test results do not independently establish the correctness of every API or the recipient-side verification of exported bundles.
 
 ## Known limitations
 
-Record the actual database configuration, security controls, concurrency
+- Record the actual database configuration, security controls, concurrency
 behavior, checkpoint protection, and report scalability.
 
-An in-memory database is not durable across restarts. Hash-chain verification
+- An in-memory database is not durable across restarts. Hash-chain verification
 does not independently protect a checkpoint stored in the same database.
 
+- H2 is configured as an in-memory database, so records are not durable across application restarts.
+- Export-time redaction changes the exported payload, not the original payload stored in the database.
+- The exported chain metadata is not independently trusted merely because it is included in the export.
+- The prototype does not claim production-grade authentication or authorization unless those controls are implemented and tested.
 ## Conclusion
 
-The prototype demonstrates the intended audit workflow. Production readiness
-requires successful tests, persistent storage, security controls, protected
-integrity checkpoints, and operational validation.
+The project implements the core audit-event workflow, querying, hash-chain verification, retention marking, export-time redaction, and compliance reporting.
+
+The current export contains chain metadata and server-side integrity status. Independent verification by a recipient against a trusted checkpoint remains a separate requirement to implement and validate.
+
+The project is a prototype. Production deployment would require durable storage, appropriate authentication and authorization, independent checkpoint protection, concurrency and recovery testing, and validation of the export-verification design.

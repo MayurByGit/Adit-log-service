@@ -26,31 +26,26 @@ Example request:
 }
 ```
 
-The service assigns the sequence number, timestamp, previous hash, and event hash. It persists the event and updates the chain checkpoint.
-
-Confirm the actual HTTP success status from `AuditController.java` and the Postman response.
+The service assigns the sequence number, timestamp, previous hash, and event hash. The event is persisted and the chain checkpoint is updated within a transaction. The endpoint returns HTTP 201 Created on successful creation. The API does not expose event update or delete operations.
 
 ## 2. Query Events
 
 **Endpoint:** `GET /audit/events`
 
-Example:
-
-`GET /audit/events?page=0&size=10`
-
-Supported filters depend on the implemented controller and repository. Document only filters that are actually implemented:
+The endpoint supports the following optional filters:
 
 - `actorId`
 - `resourceType`
 - `resourceId`
 - `eventType`
-- `from` / `to` or the actual timestamp parameter names
-- `page`
-- `size`
+- `from`
+- `to`
 
-The expected ordering is sequence number ascending if implemented by the query.
+Results are ordered by `sequenceNumber` ascending. Pagination uses zero-based `page` and `size` parameters. The default page is `0`, the default page size is `20`, and the maximum page size is `100`.
 
-Confirm the default page, page size, response format, and timestamp parameter names against the code.
+The `from` and `to` parameters use ISO-8601 date-time values. If both are supplied, `from` must not be later than `to`. Negative page values, page sizes below 1, and page sizes above 100 are rejected.
+
+Verify the actual HTTP status and error response for invalid input before documenting exact error codes.
 
 ## 3. Verify Chain Integrity
 

@@ -69,4 +69,15 @@ See `docs/risk-analysis.md`. The project is a prototype and must not be consider
 
 ## Validation Status
 
-Record the actual build and test results here only after executing the commands. Include the date tested, test counts, any failures, and endpoints manually verified.
+- Test command: `mvn clean test`
+- Test execution date: [enter actual date]
+- Maven build result: `BUILD SUCCESS`
+- Total tests: [enter actual total]
+- Failures: [enter actual count]
+- Errors: [enter actual count]
+- Skipped: [enter actual count]
+- Application startup: [verified / not yet verified]
+- Endpoints manually tested: [list only endpoints actually tested]
+- Known limitations: See `docs/risk-analysis.md` and `docs/api-design.md`.
+
+A successful Maven build confirms that the Maven lifecycle completed successfully. Manual API behavior and export verification must be validated separately.
