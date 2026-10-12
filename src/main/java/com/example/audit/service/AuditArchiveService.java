@@ -86,25 +86,44 @@ public class AuditArchiveService {
         return candidates.size();
     }
 
+
     /**
-     * Exports all events in sequence order.
+     * Exports audit events, optionally filtered by actor or resource.
      * Redaction affects only the exported payload representation.
      */
     @Transactional(readOnly = true)
     public AuditExportResponse exportEvents(
-            boolean redactSensitiveData) {
+            boolean redactSensitiveData,
+            String actorId,
+            String resourceId) {
 
+        // Verify the complete chain, not just the filtered subset.
         VerificationResponse verification = verificationService.verify();
 
+        // Load events in sequence order.
         List<AuditEvent> storedEvents =
                 repository.findAllByOrderBySequenceNumberAsc();
 
-        int archivedCount = (int) storedEvents.stream()
+        // Apply optional filters.
+        List<AuditEvent> filteredEvents = storedEvents.stream()
+                .filter(event ->
+                        actorId == null
+                                || actorId.isBlank()
+                                || actorId.equals(event.getActorId()))
+                .filter(event ->
+                        resourceId == null
+                                || resourceId.isBlank()
+                                || resourceId.equals(event.getResourceId()))
+                .toList();
+
+        // Count archived records in this export.
+        int archivedCount = (int) filteredEvents.stream()
                 .filter(AuditEvent::isArchived)
                 .count();
 
+        // Convert to response objects and redact only if requested.
         List<AuditEventResponse> exportedEvents =
-                storedEvents.stream()
+                filteredEvents.stream()
                         .map(event -> toResponse(
                                 event, redactSensitiveData))
                         .toList();
@@ -118,6 +137,7 @@ public class AuditArchiveService {
                 exportedEvents
         );
     }
+
 
     private AuditEventResponse toResponse(
             AuditEvent event,

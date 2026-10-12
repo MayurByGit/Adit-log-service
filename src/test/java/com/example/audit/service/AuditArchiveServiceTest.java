@@ -94,7 +94,7 @@ class AuditArchiveServiceTest {
                 .thenReturn(new VerificationResponse(
                         true, null, null, "Audit chain is intact"));
 
-        var result = service.exportEvents(true);
+        var result = service.exportEvents(true,null,null);
 
         assertEquals(1, result.totalEvents());
         assertEquals(0, result.archivedEvents());
@@ -120,7 +120,7 @@ class AuditArchiveServiceTest {
                         false, 1L, "EVENT_HASH_MISMATCH",
                         "Stored event content does not match its hash"));
 
-        var result = service.exportEvents(false);
+        var result = service.exportEvents(false,null,null);
 
         assertFalse(result.integrityVerified());
         assertEquals(

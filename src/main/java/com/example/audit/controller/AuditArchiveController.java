@@ -42,9 +42,14 @@ public class AuditArchiveController {
     @GetMapping("/export")
     public AuditExportResponse export(
             @RequestParam(defaultValue = "false")
-                    boolean redact) {
+                    boolean redact,
+            @RequestParam(required = false)
+                    String actorId,
+            @RequestParam(required = false)
+                    String resourceId) {
 
-        return archiveService.exportEvents(redact);
+        return archiveService.exportEvents(
+                redact, actorId, resourceId);
     }
 }
 
