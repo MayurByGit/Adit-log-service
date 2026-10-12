@@ -6,17 +6,15 @@
 The Audit Log Service is a Spring Boot REST application for recording,
 querying, verifying, archiving, exporting, and reporting audit events.
 
-## 2. Technology stack
+## 2. Technology Stack
 
-- Java 21
-- Spring Boot
+- Java 17
+- Spring Boot 4.1.1
 - Spring Data JPA
-- H2 for local development and testing
+- H2 database for local development and testing
 - Maven
 - SHA-256 for event hashing
-- JUnit and Mockito for automated tests
-
-Confirm the versions against pom.xml before submission.
+- JUnit and the test libraries declared in `pom.xml`
 
 ## 3. Layered architecture
 

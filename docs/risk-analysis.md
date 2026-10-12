@@ -31,3 +31,13 @@ collection. A compliance report does not prove regulatory compliance.
 
 Prioritize persistent storage, authorization, independent checkpoint protection,
 transaction and concurrency testing, and operational recovery before production use.
+
+### Filtered Export and Verification Metadata Disclosure
+
+**Risk:** Export verification metadata can reveal information about events that are not included in the main filtered export.
+
+**Current mitigation:** Verification metadata contains sequence numbers, timestamps, previous hashes and event hashes, but not the original payloads. The main export applies actor/resource filtering and optional payload redaction.
+
+**Residual risk:** Chain metadata can still reveal event timing and chain structure. The metadata does not independently prove the inclusion of filtered events against a trusted checkpoint.
+
+**Required follow-up:** Define and implement a recipient-verifiable proof format anchored to a checkpoint whose authenticity is established independently of the export. Test that proof verification rejects altered exported records and altered checkpoints. Consider whether metadata for unrelated events can be omitted without weakening the proof.

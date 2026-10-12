@@ -88,17 +88,24 @@ Invalid retention values should return a client error. Confirm the actual status
 
 Archived records should remain verifiable according to the chain design.
 
-## 5. Export
+## 5. Audit Export
 
-**Endpoint:** `GET /audit/archive/export?redact=true`
+**Endpoint:** `GET /audit/archive/export`
 
-Returns export metadata, audit events, and the server's integrity-verification status.
+**Query parameters:**
 
-When redaction is enabled, recognized sensitive fields are masked in the exported payload representation.
+- `redact` — optional boolean; defaults to `false`.
+- `actorId` — optional actor filter.
+- `resourceId` — optional resource filter.
 
-The unredacted export may expose sensitive data and should not be made available without appropriate access controls.
+The actor and resource filters can be combined. The main `events` list contains only events matching the supplied filters. When redaction is enabled, recognized sensitive fields are masked in the exported payloads.
 
-**Known scope to validate:** The export must support filtering by `actorId` or `resourceId` to meet the assignment requirement. The exported bundle must also provide enough chain metadata or proof for independent verification. A server-side `integrityVerified` flag alone does not provide independent verification.
+The response includes server-side integrity status and chain-link metadata. The metadata deliberately excludes original event payloads to avoid disclosing unrelated raw event content.
+
+**Verification limitation:** The current metadata does not, by itself, provide a complete independent proof that every filtered event belongs to a trusted chain. A chain-head hash contained in the same export is not an independent trust anchor. Do not treat the export as a complete cryptographic inclusion proof until a trusted checkpoint and recipient-side verification procedure have been implemented and tested.
+
+**Privacy limitation:** Chain metadata for events outside the main filtered result is still included. This can disclose event timing and chain structure. Evaluate whether this metadata is appropriate for the intended recipient and use case.
+
 
 ## 6. Compliance Report
 

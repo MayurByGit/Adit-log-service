@@ -24,7 +24,7 @@ SHA-256 hash chain.
 
 ## 4. Technical Decisions
 - Java 17
-- Spring Boot 3
+- Spring Boot 4.1.1
 - Maven
 - H2 in-memory database for the prototype
 - Spring Data JPA

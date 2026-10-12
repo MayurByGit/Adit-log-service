@@ -4,21 +4,18 @@ package com.example.audit.dto;
 import java.time.Instant;
 
 /**
- * Original, unredacted event fields needed to recalculate
- * the event hash independently.
+ * Metadata for an event in the audit hash chain.
  *
- * WARNING: This contains the original payload and can expose
- * sensitive data. Treat the verification bundle as sensitive.
+ * The payload is deliberately excluded so that a filtered export
+ * does not disclose unrelated original event payloads.
+ *
+ * This metadata alone does not prove the integrity of an omitted
+ * event's content. See the export verification documentation.
  */
 public record AuditChainVerificationEvent(
         Long sequenceNumber,
-        String eventType,
-        String actorId,
-        String resourceType,
-        String resourceId,
-        String payloadJson,
-        Instant timestamp,
         String previousHash,
-        String eventHash
+        String eventHash,
+        Instant timestamp
 ) {
 }

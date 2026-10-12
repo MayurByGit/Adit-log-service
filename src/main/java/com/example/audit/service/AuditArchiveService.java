@@ -100,15 +100,14 @@ public class AuditArchiveService {
             String actorId,
             String resourceId) {
 
-        // Load the complete chain in sequence order.
+        // Load all events in sequence order for server-side verification.
         List<AuditEvent> storedEvents =
                 repository.findAllByOrderBySequenceNumberAsc();
 
-        // Verify the complete chain, not just the filtered subset.
         VerificationResponse verification =
                 verificationService.verify();
 
-        // Main export: apply actor and resource filters.
+        // Apply filters only to the event records returned to the caller.
         List<AuditEvent> filteredEvents = storedEvents.stream()
                 .filter(event ->
                         actorId == null
@@ -124,25 +123,22 @@ public class AuditArchiveService {
                 .filter(AuditEvent::isArchived)
                 .count();
 
+        // Redaction applies to the exported event payloads.
         List<AuditEventResponse> exportedEvents =
                 filteredEvents.stream()
                         .map(event -> toResponse(
                                 event, redactSensitiveData))
                         .toList();
 
-        // Verification data uses the original, unredacted payloads.
-        List<AuditChainVerificationEvent> chainEvents =
+        // Include hash-link metadata only.
+        // Do not include original payloads for unrelated events.
+        List<AuditChainVerificationEvent> chainMetadata =
                 storedEvents.stream()
                         .map(event -> new AuditChainVerificationEvent(
                                 event.getSequenceNumber(),
-                                event.getEventType(),
-                                event.getActorId(),
-                                event.getResourceType(),
-                                event.getResourceId(),
-                                event.getPayload(),
-                                event.getTimestamp(),
                                 event.getPreviousHash(),
-                                event.getEventHash()
+                                event.getEventHash(),
+                                event.getTimestamp()
                         ))
                         .toList();
 
@@ -153,12 +149,11 @@ public class AuditArchiveService {
         AuditExportVerificationData verificationData =
                 new AuditExportVerificationData(
                         "SHA-256",
-                        "Length-prefixed UTF-16 Java String fields; "
-                                + "timestamp truncated to microseconds; "
-                                + "fields ordered as sequenceNumber, "
-                                + "eventType, actorId, resourceType, "
-                                + "resourceId, payloadJson, timestamp, "
-                                + "previousHash",
+                        "Fields are length-prefixed using Java String.length(); "
+                                + "timestamp is truncated to microseconds; "
+                                + "field order: sequenceNumber, eventType, "
+                                + "actorId, resourceType, resourceId, payload, "
+                                + "timestamp, previousHash",
                         hashChainService.getGenesisHash(),
                         lastEvent == null
                                 ? 0L
@@ -166,7 +161,7 @@ public class AuditArchiveService {
                         lastEvent == null
                                 ? hashChainService.getGenesisHash()
                                 : lastEvent.getEventHash(),
-                        chainEvents
+                        chainMetadata
                 );
 
         return new AuditExportResponse(
