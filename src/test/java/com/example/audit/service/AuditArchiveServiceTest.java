@@ -29,13 +29,19 @@ class AuditArchiveServiceTest {
 
     private ObjectMapper objectMapper;
     private AuditArchiveService service;
+    HashChainService hashChainService = new HashChainService();
+
 
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper();
         service = new AuditArchiveService(
-                repository, verificationService, objectMapper);
+                repository,
+                verificationService,
+                objectMapper,
+                hashChainService);
     }
+
 
     @Test
     void shouldRedactSensitiveFieldsRecursively() throws Exception {

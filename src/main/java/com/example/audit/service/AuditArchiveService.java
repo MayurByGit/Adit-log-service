@@ -12,6 +12,8 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
+import com.example.audit.dto.AuditChainVerificationEvent;
+import com.example.audit.dto.AuditExportVerificationData;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -25,6 +27,7 @@ public class AuditArchiveService {
 
     private static final int MIN_RETENTION_DAYS = 1;
     private static final int MAX_RETENTION_DAYS = 36500;
+
 
     private static final Set<String> SENSITIVE_FIELDS = Set.of(
             "password",
@@ -47,14 +50,18 @@ public class AuditArchiveService {
     private final AuditEventRepository repository;
     private final VerificationService verificationService;
     private final ObjectMapper objectMapper;
+    private final HashChainService hashChainService;
 
     public AuditArchiveService(
             AuditEventRepository repository,
             VerificationService verificationService,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            HashChainService hashChainService) {
+
         this.repository = repository;
         this.verificationService = verificationService;
         this.objectMapper = objectMapper;
+        this.hashChainService = hashChainService;
     }
 
     /**
@@ -87,24 +94,21 @@ public class AuditArchiveService {
     }
 
 
-    /**
-     * Exports audit events, optionally filtered by actor or resource.
-     * Redaction affects only the exported payload representation.
-     */
     @Transactional(readOnly = true)
     public AuditExportResponse exportEvents(
             boolean redactSensitiveData,
             String actorId,
             String resourceId) {
 
-        // Verify the complete chain, not just the filtered subset.
-        VerificationResponse verification = verificationService.verify();
-
-        // Load events in sequence order.
+        // Load the complete chain in sequence order.
         List<AuditEvent> storedEvents =
                 repository.findAllByOrderBySequenceNumberAsc();
 
-        // Apply optional filters.
+        // Verify the complete chain, not just the filtered subset.
+        VerificationResponse verification =
+                verificationService.verify();
+
+        // Main export: apply actor and resource filters.
         List<AuditEvent> filteredEvents = storedEvents.stream()
                 .filter(event ->
                         actorId == null
@@ -116,17 +120,54 @@ public class AuditArchiveService {
                                 || resourceId.equals(event.getResourceId()))
                 .toList();
 
-        // Count archived records in this export.
         int archivedCount = (int) filteredEvents.stream()
                 .filter(AuditEvent::isArchived)
                 .count();
 
-        // Convert to response objects and redact only if requested.
         List<AuditEventResponse> exportedEvents =
                 filteredEvents.stream()
                         .map(event -> toResponse(
                                 event, redactSensitiveData))
                         .toList();
+
+        // Verification data uses the original, unredacted payloads.
+        List<AuditChainVerificationEvent> chainEvents =
+                storedEvents.stream()
+                        .map(event -> new AuditChainVerificationEvent(
+                                event.getSequenceNumber(),
+                                event.getEventType(),
+                                event.getActorId(),
+                                event.getResourceType(),
+                                event.getResourceId(),
+                                event.getPayload(),
+                                event.getTimestamp(),
+                                event.getPreviousHash(),
+                                event.getEventHash()
+                        ))
+                        .toList();
+
+        AuditEvent lastEvent = storedEvents.isEmpty()
+                ? null
+                : storedEvents.get(storedEvents.size() - 1);
+
+        AuditExportVerificationData verificationData =
+                new AuditExportVerificationData(
+                        "SHA-256",
+                        "Length-prefixed UTF-16 Java String fields; "
+                                + "timestamp truncated to microseconds; "
+                                + "fields ordered as sequenceNumber, "
+                                + "eventType, actorId, resourceType, "
+                                + "resourceId, payloadJson, timestamp, "
+                                + "previousHash",
+                        hashChainService.getGenesisHash(),
+                        lastEvent == null
+                                ? 0L
+                                : lastEvent.getSequenceNumber(),
+                        lastEvent == null
+                                ? hashChainService.getGenesisHash()
+                                : lastEvent.getEventHash(),
+                        chainEvents
+                );
 
         return new AuditExportResponse(
                 Instant.now(),
@@ -134,7 +175,8 @@ public class AuditArchiveService {
                 archivedCount,
                 verification.valid(),
                 verification.message(),
-                exportedEvents
+                exportedEvents,
+                verificationData
         );
     }
 

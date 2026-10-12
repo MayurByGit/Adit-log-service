@@ -1,3 +1,4 @@
+
 package com.example.audit.dto;
 
 import java.time.Instant;
@@ -9,6 +10,7 @@ public record AuditExportResponse(
         int archivedEvents,
         boolean integrityVerified,
         String integrityMessage,
-        List<AuditEventResponse> events
+        List<AuditEventResponse> events,
+        AuditExportVerificationData verificationData
 ) {
 }
