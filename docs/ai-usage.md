@@ -28,15 +28,14 @@ The developer is responsible for:
 
 ## Actual validation record
 
-- **Test command:** `mvn clean test`
-- **Test execution date:** [enter the date the command was run]
-- **Result:** Maven reported `BUILD SUCCESS`. Test totals and failure counts are recorded in the README after checking the complete output.
-- **Endpoints tested:** [list only endpoints actually exercised]
-- **Known failures:** [enter known failures, or state that no failures were observed in the checks actually performed]
-- **Code and documentation reviewed:** [list the files actually reviewed]
-- **AI-generated or AI-assisted changes:** [identify relevant code, test, and documentation changes]
-- **Human review:** [describe what you personally inspected, ran, and validated]
-- **Rejected or modified suggestions:** [record material suggestions you rejected or changed, with reasons]
+- **Additional validation commands:** `mvnw.cmd test` and `mvnw.cmd -DforkCount=0 test` against the extracted reference copy; `mvnw.cmd -DskipTests test` against this checkout
+- **Execution date:** 2026-10-13
+- **Result:** Main and test sources in this checkout compiled successfully with tests skipped. In the extracted reference copy, the test process did not complete during Spring test startup; no Surefire result report was produced. No test pass total is claimed for that attempt.
+- **Endpoints tested in this work session:** None.
+- **Code and documentation reviewed:** `VerificationService.java`, `AuditEvent.java`, `AuditScenarioATest.java`, `api-design.md`, `engineering-summary.md`, `README.md`, and this file.
+- **AI-generated or AI-assisted changes:** Improved missing-sequence reporting, added integration cases for deleting an interior or tail event, removed the unused redacted-payload field, and clarified the export verification limitation.
+- **Human review:** The developer should review these changes and independently rerun the tests before submission.
+- **Rejected or modified suggestions:** A recipient-verifiable export redesign was not implemented; the privacy and trust-anchor design still needs to be selected and tested. The API documentation records the limitation.
 
 This record describes the actual development process. It does not claim that AI-generated code was automatically correct or that untested behavior works.
 

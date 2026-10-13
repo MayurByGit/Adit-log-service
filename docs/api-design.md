@@ -73,6 +73,12 @@ Example response for a valid chain:
 
 The exact response message depends on the implementation.
 
+For a gap in sequence numbering, `firstInvalidSequence` identifies the
+sequence number that was expected but is absent. If the stored tail is shorter
+than the checkpoint, it identifies the next checkpoint sequence that is
+missing. A checkpoint mismatch caused by a checkpoint value behind the final
+event identifies the final event sequence.
+
 ## 4. Retention
 
 **Endpoint:** `POST /audit/archive/retention?retentionDays=365`
@@ -98,6 +104,12 @@ The actor and resource filters can be combined. The main `events` list contains 
 The response includes server-side integrity status and chain-link metadata. The metadata deliberately excludes original event payloads to avoid disclosing unrelated raw event content.
 
 **Verification limitation:** The current metadata does not, by itself, provide a complete independent proof that every filtered event belongs to a trusted chain. A chain-head hash contained in the same export is not an independent trust anchor. Do not treat the export as a complete cryptographic inclusion proof until a trusted checkpoint and recipient-side verification procedure have been implemented and tested.
+
+The current export reports the server's verification result at export time and
+includes event hash/link metadata. It is not signed and does not include the
+source payloads for records omitted by the export filters. A recipient cannot
+independently recompute the complete chain from this bundle. This remains an
+open requirement for Scenario B.
 
 **Privacy limitation:** Chain metadata for events outside the main filtered result is still included. This can disclose event timing and chain structure. Evaluate whether this metadata is appropriate for the intended recipient and use case.
 

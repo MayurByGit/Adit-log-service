@@ -70,14 +70,20 @@ See `docs/risk-analysis.md`. The project is a prototype and must not be consider
 ## Validation Status
 
 - Test command: `mvn clean test`
-- Test execution date: [enter actual date]
+- Test execution date: 12-10-2026
 - Maven build result: `BUILD SUCCESS`
-- Total tests: [enter actual total]
-- Failures: [enter actual count]
-- Errors: [enter actual count]
-- Skipped: [enter actual count]
-- Application startup: [verified / not yet verified]
-- Endpoints manually tested: [list only endpoints actually tested]
+- Total tests: 19
+- Failures: 0
+- Errors: 0
+- Skipped: 0
+- Application startup: verified
+- Endpoints manually tested:
 - Known limitations: See `docs/risk-analysis.md` and `docs/api-design.md`.
 
 A successful Maven build confirms that the Maven lifecycle completed successfully. Manual API behavior and export verification must be validated separately.
+
+Latest check in this work session (2026-10-13) was run against the extracted
+reference copy, not this checkout: main and test sources compiled, but the test
+process did not complete during Spring test startup in this environment. This
+checkout has since passed `mvnw.cmd -DskipTests test`, which compiled the main
+and test sources while skipping test execution. See `docs/engineering-summary.md`.

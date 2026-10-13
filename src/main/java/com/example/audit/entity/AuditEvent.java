@@ -52,9 +52,6 @@ public class AuditEvent {
     @Column(name = "event_hash", nullable = false, length = 64)
     private String eventHash;
 
-    @Column(name = "redacted_payload", columnDefinition = "CLOB")
-    private String redactedPayload;
-
     @Column(name = "archived", nullable = false)
     private boolean archived = false;
 
@@ -125,15 +122,6 @@ public class AuditEvent {
 
     public String getEventHash() {
         return eventHash;
-    }
-
-    public String getRedactedPayload() {
-        return redactedPayload;
-    }
-
-
-    public void setRedactedPayload(String redactedPayload) {
-        this.redactedPayload = redactedPayload;
     }
 
     public void markArchived() {

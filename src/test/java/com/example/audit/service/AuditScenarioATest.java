@@ -121,6 +121,47 @@ class AuditScenarioATest {
                         .value("EVENT_HASH_MISMATCH"));
     }
 
+    @Test
+    @Transactional
+    void shouldReportFirstMissingSequenceWhenAnEventIsDeleted()
+            throws Exception {
+        createEvent("USER_CREATED", "user-123", "user-001");
+        createEvent("USER_UPDATED", "user-123", "user-001");
+
+        AuditEvent first = eventRepository
+                .findAllByOrderBySequenceNumberAsc()
+                .get(0);
+        eventRepository.delete(first);
+        eventRepository.flush();
+
+        mockMvc.perform(get("/audit/verify"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.valid").value(false))
+                .andExpect(jsonPath("$.firstInvalidSequence").value(1))
+                .andExpect(jsonPath("$.violationType")
+                        .value("SEQUENCE_MISMATCH"));
+    }
+
+    @Test
+    @Transactional
+    void shouldReportDeletedTailEventAgainstCheckpoint() throws Exception {
+        createEvent("USER_CREATED", "user-123", "user-001");
+        createEvent("USER_UPDATED", "user-123", "user-001");
+
+        AuditEvent last = eventRepository
+                .findAllByOrderBySequenceNumberAsc()
+                .get(1);
+        eventRepository.delete(last);
+        eventRepository.flush();
+
+        mockMvc.perform(get("/audit/verify"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.valid").value(false))
+                .andExpect(jsonPath("$.firstInvalidSequence").value(2))
+                .andExpect(jsonPath("$.violationType")
+                        .value("CHECKPOINT_MISMATCH"));
+    }
+
     private void createEvent(
             String eventType,
             String actorId,

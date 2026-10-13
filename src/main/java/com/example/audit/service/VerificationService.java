@@ -61,9 +61,10 @@ public class VerificationService {
             if (actualSequence == null
                     || actualSequence != expectedSequence) {
                 return invalid(
-                        actualSequence,
+                        expectedSequence,
                         "SEQUENCE_MISMATCH",
-                        "Audit event sequence is missing or out of order");
+                        "Expected audit event sequence " + expectedSequence
+                                + " but found " + actualSequence);
             }
 
             if (!expectedPreviousHash.equals(event.getPreviousHash())) {
@@ -98,12 +99,16 @@ public class VerificationService {
 
         if (checkpoint == null
                 || checkpoint.getLatestSequence() == null
-                || checkpoint.getLatestSequence()
-                != lastEvent.getSequenceNumber()
+                || !checkpoint.getLatestSequence().equals(lastEvent.getSequenceNumber())
                 || !lastEvent.getEventHash()
                 .equals(checkpoint.getLatestHash())) {
             return invalid(
-                    lastEvent.getSequenceNumber(),
+                    checkpoint != null
+                            && checkpoint.getLatestSequence() != null
+                            && checkpoint.getLatestSequence()
+                            > lastEvent.getSequenceNumber()
+                            ? lastEvent.getSequenceNumber() + 1L
+                            : lastEvent.getSequenceNumber(),
                     "CHECKPOINT_MISMATCH",
                     "Chain checkpoint does not match the last event");
         }

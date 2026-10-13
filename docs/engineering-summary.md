@@ -33,17 +33,14 @@ for local development and tests.
 
 ## Validation record
 
-- **Date tested:** 12-10-2026
-- **Command executed:** `mvn clean test`
-- **Build result:** `BUILD SUCCESS`
-- **Total tests:** 19
-- **Passed:** 19
-- **Failed:** 0
-- **Errors:** 0
-- **Skipped:** 0
-- **Application startup result:** Yes
-- **Endpoints verified manually:** Yes
-- **Known failures or untested paths:** No
+- **Prior recorded run:** The README records `mvn clean test` on 2026-10-12 with 19 passing tests. That result predates the changes below and was not independently checked in this work session.
+- **Date checked:** 2026-10-13
+- **Commands attempted:** `mvnw.cmd test` and `mvnw.cmd -DforkCount=0 test` against the extracted reference copy; `mvnw.cmd -DskipTests test` against this checkout.
+- **Compilation:** Main and test sources in this checkout compiled successfully with tests skipped.
+- **Test result:** The test process in the extracted reference copy did not complete during Spring test startup in this environment; no Surefire result report was produced. No test totals are claimed for that run.
+- **Application startup result:** The Spring context started as part of the test process, but the overall test run did not complete.
+- **Endpoints verified manually:** None during this work session.
+- **Known unverified paths:** Full test suite and manual endpoint behavior remain to be run and confirmed.
 
 The build result and automated test results do not independently establish the correctness of every API or the recipient-side verification of exported bundles.
 
