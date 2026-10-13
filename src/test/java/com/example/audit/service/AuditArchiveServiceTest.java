@@ -1,6 +1,7 @@
 package com.example.audit.service;
 
 import com.example.audit.dto.VerificationResponse;
+import com.example.audit.dto.SignedAuditExportResponse;
 import com.example.audit.entity.AuditEvent;
 import com.example.audit.repository.AuditEventRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,6 +13,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
+import java.util.Base64;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -40,7 +42,8 @@ class AuditArchiveServiceTest {
                 repository,
                 verificationService,
                 objectMapper,
-                hashChainService
+                hashChainService,
+                new AuditExportSigningService("", "")
         );
     }
 
@@ -113,17 +116,17 @@ class AuditArchiveServiceTest {
                 )
         );
 
-        var result = service.exportEvents(true, null, null);
+        var result = unpack(service.exportEvents(true, null, null));
 
-        assertEquals(1, result.totalEvents());
-        assertEquals(0, result.archivedEvents());
-        assertTrue(result.integrityVerified());
+        assertEquals(1, result.get("totalEvents").asInt());
+        assertEquals(0, result.get("archivedEvents").asInt());
+        assertTrue(result.get("integrityVerified").asBoolean());
         assertEquals(
                 "Audit chain is intact",
-                result.integrityMessage()
+                result.get("integrityMessage").asString()
         );
 
-        JsonNode exportedPayload = result.events().get(0).payload();
+        JsonNode exportedPayload = result.get("events").get(0).get("payload");
 
         assertEquals(
                 "[REDACTED]",
@@ -138,7 +141,7 @@ class AuditArchiveServiceTest {
     }
 
     @Test
-    void shouldReportFailedIntegrityVerificationOnExport() {
+    void shouldReportFailedIntegrityVerificationOnExport() throws Exception {
         when(repository.findAllByOrderBySequenceNumberAsc())
                 .thenReturn(List.of());
 
@@ -151,14 +154,14 @@ class AuditArchiveServiceTest {
                 )
         );
 
-        var result = service.exportEvents(false, null, null);
+        var result = unpack(service.exportEvents(false, null, null));
 
-        assertFalse(result.integrityVerified());
+        assertFalse(result.get("integrityVerified").asBoolean());
         assertEquals(
                 "Stored event content does not match its hash",
-                result.integrityMessage()
+                result.get("integrityMessage").asString()
         );
-        assertEquals(0, result.totalEvents());
+        assertEquals(0, result.get("totalEvents").asInt());
 
         verify(verificationService).verify();
     }
@@ -256,31 +259,33 @@ class AuditArchiveServiceTest {
                 )
         );
 
-        var result = service.exportEvents(true, "user-123", null);
+        var result = unpack(service.exportEvents(true, "user-123", null));
 
         // Only the matching event should be in the filtered export.
-        assertEquals(1, result.events().size());
-        assertEquals("user-123", result.events().get(0).actorId());
+        assertEquals(1, result.get("events").size());
+        assertEquals("user-123",
+                result.get("events").get(0).get("actorId").asString());
         assertEquals(
                 "[REDACTED]",
-                result.events().get(0).payload().get("email").asString()
+                result.get("events").get(0).get("payload")
+                        .get("email").asString()
         );
 
         // Verification metadata should cover both stored events.
         assertEquals(
                 2,
-                result.verificationData().chainMetadata().size()
+                result.get("verificationData").get("chainMetadata").size()
         );
 
         assertEquals(
                 1L,
-                result.verificationData()
-                        .chainMetadata().get(0).sequenceNumber()
+                result.get("verificationData").get("chainMetadata")
+                        .get(0).get("sequenceNumber").asLong()
         );
         assertEquals(
                 2L,
-                result.verificationData()
-                        .chainMetadata().get(1).sequenceNumber()
+                result.get("verificationData").get("chainMetadata")
+                        .get(1).get("sequenceNumber").asLong()
         );
 
         // Raw sensitive values must not appear anywhere in the export JSON.
@@ -293,7 +298,7 @@ class AuditArchiveServiceTest {
     }
 
     @Test
-    void shouldFilterExportByResourceId() {
+    void shouldFilterExportByResourceId() throws Exception {
         AuditEvent matchingEvent = mockEvent(
                 1L,
                 "USER_CREATED",
@@ -322,20 +327,20 @@ class AuditArchiveServiceTest {
                 )
         );
 
-        var result = service.exportEvents(false, null, "resource-1");
+        var result = unpack(service.exportEvents(false, null, "resource-1"));
 
-        assertEquals(1, result.events().size());
+        assertEquals(1, result.get("events").size());
         assertEquals(
                 "resource-1",
-                result.events().get(0).resourceId()
+                result.get("events").get(0).get("resourceId").asString()
         );
-        assertEquals(1, result.totalEvents());
+        assertEquals(1, result.get("totalEvents").asInt());
 
         verify(verificationService).verify();
     }
 
     @Test
-    void shouldApplyActorAndResourceFiltersTogether() {
+    void shouldApplyActorAndResourceFiltersTogether() throws Exception {
         AuditEvent matchingEvent = mockEvent(
                 1L,
                 "USER_CREATED",
@@ -364,17 +369,18 @@ class AuditArchiveServiceTest {
                 )
         );
 
-        var result = service.exportEvents(
+        var result = unpack(service.exportEvents(
                 false,
                 "user-123",
                 "resource-1"
-        );
+        ));
 
-        assertEquals(1, result.events().size());
-        assertEquals("user-123", result.events().get(0).actorId());
+        assertEquals(1, result.get("events").size());
+        assertEquals("user-123",
+                result.get("events").get(0).get("actorId").asString());
         assertEquals(
                 "resource-1",
-                result.events().get(0).resourceId()
+                result.get("events").get(0).get("resourceId").asString()
         );
 
         verify(verificationService).verify();
@@ -415,5 +421,11 @@ class AuditArchiveServiceTest {
 
         method.setAccessible(true);
         return method.invoke(service, original);
+    }
+
+    private JsonNode unpack(SignedAuditExportResponse envelope) {
+        byte[] json = Base64.getUrlDecoder()
+                .decode(envelope.signedPayload());
+        return objectMapper.readTree(json);
     }
 }

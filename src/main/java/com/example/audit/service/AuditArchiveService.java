@@ -3,6 +3,7 @@ package com.example.audit.service;
 
 import com.example.audit.dto.AuditEventResponse;
 import com.example.audit.dto.AuditExportResponse;
+import com.example.audit.dto.SignedAuditExportResponse;
 import com.example.audit.dto.VerificationResponse;
 import com.example.audit.entity.AuditEvent;
 import com.example.audit.repository.AuditEventRepository;
@@ -51,17 +52,20 @@ public class AuditArchiveService {
     private final VerificationService verificationService;
     private final ObjectMapper objectMapper;
     private final HashChainService hashChainService;
+    private final AuditExportSigningService exportSigningService;
 
     public AuditArchiveService(
             AuditEventRepository repository,
             VerificationService verificationService,
             ObjectMapper objectMapper,
-            HashChainService hashChainService) {
+            HashChainService hashChainService,
+            AuditExportSigningService exportSigningService) {
 
         this.repository = repository;
         this.verificationService = verificationService;
         this.objectMapper = objectMapper;
         this.hashChainService = hashChainService;
+        this.exportSigningService = exportSigningService;
     }
 
     /**
@@ -95,7 +99,7 @@ public class AuditArchiveService {
 
 
     @Transactional(readOnly = true)
-    public AuditExportResponse exportEvents(
+    public SignedAuditExportResponse exportEvents(
             boolean redactSensitiveData,
             String actorId,
             String resourceId) {
@@ -164,7 +168,7 @@ public class AuditArchiveService {
                         chainMetadata
                 );
 
-        return new AuditExportResponse(
+        AuditExportResponse bundle = new AuditExportResponse(
                 Instant.now(),
                 exportedEvents.size(),
                 archivedCount,
@@ -173,6 +177,14 @@ public class AuditArchiveService {
                 exportedEvents,
                 verificationData
         );
+
+        try {
+            byte[] payload = objectMapper.writeValueAsBytes(bundle);
+            return exportSigningService.sign(payload);
+        } catch (Exception exception) {
+            throw new IllegalStateException(
+                    "Unable to serialize audit export", exception);
+        }
     }
 
 

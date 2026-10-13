@@ -101,18 +101,39 @@ Archived records should remain verifiable according to the chain design.
 
 The actor and resource filters can be combined. The main `events` list contains only events matching the supplied filters. When redaction is enabled, recognized sensitive fields are masked in the exported payloads.
 
-The response includes server-side integrity status and chain-link metadata. The metadata deliberately excludes original event payloads to avoid disclosing unrelated raw event content.
+The response is a signed envelope containing:
 
-**Verification limitation:** The current metadata does not, by itself, provide a complete independent proof that every filtered event belongs to a trusted chain. A chain-head hash contained in the same export is not an independent trust anchor. Do not treat the export as a complete cryptographic inclusion proof until a trusted checkpoint and recipient-side verification procedure have been implemented and tested.
+- `signedPayload`: base64url-encoded UTF-8 JSON bytes containing the export data, filtered events, chain metadata, and server-side integrity result.
+- `signatureAlgorithm`: `Ed25519`.
+- `publicKey`: Base64-encoded X.509 public key bytes.
+- `signingKeyId`: SHA-256 fingerprint of the encoded public key.
+- `signature`: base64url-encoded Ed25519 signature.
 
-The current export reports the server's verification result at export time and
-includes event hash/link metadata. It is not signed and does not include the
-source payloads for records omitted by the export filters. A recipient cannot
-independently recompute the complete chain from this bundle. This remains an
-open requirement for Scenario B.
+Require `formatVersion` to be `1`, `payloadEncoding` to be
+`base64url(UTF-8 JSON bytes)`, and `signatureAlgorithm` to be `Ed25519`. To
+verify, decode `signedPayload` and `signature`, check that `signingKeyId` is
+the SHA-256 fingerprint of `publicKey`, then verify Ed25519 over the UTF-8
+bytes `AUDIT-EXPORT-V1\n`, followed by the ASCII key ID, a newline, and the
+decoded payload bytes. Parse the signed JSON only after signature verification;
+do not reserialize it before verification.
 
-**Privacy limitation:** Chain metadata for events outside the main filtered result is still included. This can disclose event timing and chain structure. Evaluate whether this metadata is appropriate for the intended recipient and use case.
+Recipients should obtain the expected `signingKeyId` through a trusted
+out-of-band channel. Without a pinned key ID, a recipient can verify that the
+envelope is internally consistent and detect changes to its signed bytes, but
+cannot establish who signed it. By default, the service generates an ephemeral
+key at startup. Configure both `AUDIT_EXPORT_SIGNING_PRIVATE_KEY` (Base64
+PKCS#8) and `AUDIT_EXPORT_SIGNING_PUBLIC_KEY` (Base64 X.509) to use a stable
+identity across restarts; do not commit private key material.
 
+The signature protects the exported bundle as of export time. It does not let
+the recipient recompute hashes for omitted events because their payloads are
+excluded, and it is not a cryptographic inclusion proof against an externally
+trusted checkpoint. Chain metadata for events outside the main filtered result
+is still included, which can disclose event timing and chain structure.
+
+Redaction applies to exported copies only. Original payload values remain in
+the database and are returned by the normal query API. This design preserves
+the hashes of stored events but does not provide erasure or redact-at-rest.
 
 ## 6. Compliance Report
 

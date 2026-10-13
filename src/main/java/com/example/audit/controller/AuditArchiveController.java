@@ -1,7 +1,7 @@
 
 package com.example.audit.controller;
 
-import com.example.audit.dto.AuditExportResponse;
+import com.example.audit.dto.SignedAuditExportResponse;
 import com.example.audit.service.AuditArchiveService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -40,7 +40,7 @@ public class AuditArchiveController {
     }
 
     @GetMapping("/export")
-    public AuditExportResponse export(
+    public SignedAuditExportResponse export(
             @RequestParam(defaultValue = "false")
                     boolean redact,
             @RequestParam(required = false)

@@ -36,8 +36,8 @@ transaction and concurrency testing, and operational recovery before production 
 
 **Risk:** Export verification metadata can reveal information about events that are not included in the main filtered export.
 
-**Current mitigation:** Verification metadata contains sequence numbers, timestamps, previous hashes and event hashes, but not the original payloads. The main export applies actor/resource filtering and optional payload redaction.
+**Current mitigation:** The export envelope signs the exact JSON bytes with Ed25519. The main export applies actor/resource filtering and optional payload redaction. Recipients can verify the signature and detect changes to the bundle after export.
 
-**Residual risk:** Chain metadata can still reveal event timing and chain structure. The metadata does not independently prove the inclusion of filtered events against a trusted checkpoint.
+**Residual risk:** Chain metadata can still reveal event timing and chain structure. The signature authenticates the bundle as issued; omitted event payloads are not provided as proofs against an external chain checkpoint. A public key included in the bundle is not an identity trust anchor by itself.
 
-**Required follow-up:** Define and implement a recipient-verifiable proof format anchored to a checkpoint whose authenticity is established independently of the export. Test that proof verification rejects altered exported records and altered checkpoints. Consider whether metadata for unrelated events can be omitted without weakening the proof.
+**Required follow-up:** Pin the signing key fingerprint through a trusted channel, configure stable signing keys outside source control, and decide whether a separate inclusion-proof format is required. Consider whether metadata for unrelated events can be omitted without weakening the proof.

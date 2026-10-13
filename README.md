@@ -61,6 +61,7 @@ See `docs/architecture.md`.
 
 - `docs/requirements.md`
 - `docs/scenario-c-assumptions.md`
+- `docs/scenario-execution-plan.md`
 - `docs/engineering-summary.md`
 
 ## Risks and Limitations
@@ -69,21 +70,11 @@ See `docs/risk-analysis.md`. The project is a prototype and must not be consider
 
 ## Validation Status
 
-- Test command: `mvn clean test`
-- Test execution date: 12-10-2026
-- Maven build result: `BUILD SUCCESS`
-- Total tests: 19
-- Failures: 0
-- Errors: 0
-- Skipped: 0
-- Application startup: verified
-- Endpoints manually tested:
+- Prior recorded run (2026-10-12): `mvn clean test`, 19 tests passed. This predates the changes below.
+- Latest compile check (2026-10-13): `mvnw.cmd -DskipTests test` completed successfully and compiled main and test sources; execution was skipped.
+- Targeted signature test (2026-10-13): `mvnw.cmd -Dtest=AuditExportSigningServiceTest test`, 1 test passed.
+- Current source contains 23 `@Test` methods. The full suite has not completed after the latest changes; a run stalled during Mockito dynamic agent attachment, so no aggregate result is claimed.
+- Endpoints manually tested in this work session: none.
 - Known limitations: See `docs/risk-analysis.md` and `docs/api-design.md`.
 
 A successful Maven build confirms that the Maven lifecycle completed successfully. Manual API behavior and export verification must be validated separately.
-
-Latest check in this work session (2026-10-13) was run against the extracted
-reference copy, not this checkout: main and test sources compiled, but the test
-process did not complete during Spring test startup in this environment. This
-checkout has since passed `mvnw.cmd -DskipTests test`, which compiled the main
-and test sources while skipping test execution. See `docs/engineering-summary.md`.

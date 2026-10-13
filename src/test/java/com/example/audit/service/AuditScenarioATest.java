@@ -99,6 +99,44 @@ class AuditScenarioATest {
     }
 
     @Test
+    void shouldCanonicalizePayloadObjectKeysBeforeHashing() throws Exception {
+        String firstRequest = """
+                {
+                  "eventType": "PAYLOAD_CHECK",
+                  "actorId": "user-123",
+                  "resourceType": "TEST_RESOURCE",
+                  "resourceId": "resource-1",
+                  "payload": {"z": 1, "nested": {"y": 2, "x": 3}}
+                }
+                """;
+        String secondRequest = """
+                {
+                  "eventType": "PAYLOAD_CHECK",
+                  "actorId": "user-123",
+                  "resourceType": "TEST_RESOURCE",
+                  "resourceId": "resource-2",
+                  "payload": {"nested": {"x": 3, "y": 2}, "z": 1}
+                }
+                """;
+
+        mockMvc.perform(post("/audit/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(firstRequest))
+                .andExpect(status().isCreated());
+        mockMvc.perform(post("/audit/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(secondRequest))
+                .andExpect(status().isCreated());
+
+        var events = eventRepository.findAllByOrderBySequenceNumberAsc();
+        org.junit.jupiter.api.Assertions.assertEquals(
+                events.get(0).getPayload(), events.get(1).getPayload());
+        org.junit.jupiter.api.Assertions.assertEquals(
+                "{\"nested\":{\"x\":3,\"y\":2},\"z\":1}",
+                events.get(0).getPayload());
+    }
+
+    @Test
     @Transactional
     void shouldDetectTamperedEventContent() throws Exception {
         createEvent("USER_CREATED", "user-123", "user-001");

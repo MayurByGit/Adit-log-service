@@ -58,16 +58,32 @@ Verification checks:
 The hash-chain algorithm must use a stable canonical representation.
 Changing the algorithm requires a migration and versioning strategy.
 
+Payload object keys are sorted recursively in Java string order before JSON
+serialization. Array order and scalar values are preserved. The resulting
+compact JSON string is stored and hashed. The hash input then length-prefixes
+sequence number, event type, actor ID, resource type, resource ID, canonical
+payload JSON, microsecond-normalized timestamp, and previous hash, in that
+order, using UTF-8 and SHA-256.
+
 ## 6. Retention and export
 
 Retention marks eligible events as archived without deleting their
 original event records. Export returns event data and the current
 integrity-verification result.
 
-When redaction is requested, sensitive payload fields are masked in
-the exported representation. The stored payload should remain unchanged.
+When redaction is requested, sensitive payload fields are masked in the
+exported representation. The stored payload remains unchanged. Export data is
+serialized once, then signed with Ed25519; the envelope includes the exact
+signed bytes, public key, key fingerprint, and signature so a recipient can
+detect changes to the bundle after export. A recipient must pin the key
+fingerprint out of band to authenticate the signer. Local development uses an
+ephemeral key unless a stable key pair is configured through environment
+variables.
 
-Verify these behaviors against the final implementation.
+The signature does not provide a Merkle inclusion proof or allow the recipient
+to recompute omitted records whose payloads are excluded from a filtered
+export. The signed verification status is the service's chain check at export
+time.
 
 ## 7. Compliance reporting
 
@@ -98,6 +114,10 @@ exports should be access-controlled.
 
 ## 10. Known limitations
 
-Document the limitations actually observed in the implementation,
-including concurrency testing, storage durability, authentication,
-checkpoint protection, and scalability.
+The configured H2 database is in-memory and loses records across restarts.
+Authentication and authorization are not implemented. The checkpoint is stored
+in the same database as the events. Concurrency beyond the database lock and
+report/export scalability have not been load-tested. Export redaction does not
+erase stored values. Signed exports do not provide inclusion proofs for omitted
+records and require an out-of-band pinned key fingerprint to authenticate the
+signer.

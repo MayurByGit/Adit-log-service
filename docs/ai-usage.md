@@ -28,14 +28,14 @@ The developer is responsible for:
 
 ## Actual validation record
 
-- **Additional validation commands:** `mvnw.cmd test` and `mvnw.cmd -DforkCount=0 test` against the extracted reference copy; `mvnw.cmd -DskipTests test` against this checkout
+- **Additional validation commands:** `mvnw.cmd -DskipTests test` and `mvnw.cmd -Dtest=AuditExportSigningServiceTest test` against this checkout; the full suite was also attempted but did not complete during Mockito dynamic JVM attachment
 - **Execution date:** 2026-10-13
-- **Result:** Main and test sources in this checkout compiled successfully with tests skipped. In the extracted reference copy, the test process did not complete during Spring test startup; no Surefire result report was produced. No test pass total is claimed for that attempt.
+- **Result:** Main and test sources compiled successfully with tests skipped. The targeted signature test passed (1/1). The full suite did not complete and no aggregate pass total is claimed for the updated code.
 - **Endpoints tested in this work session:** None.
 - **Code and documentation reviewed:** `VerificationService.java`, `AuditEvent.java`, `AuditScenarioATest.java`, `api-design.md`, `engineering-summary.md`, `README.md`, and this file.
-- **AI-generated or AI-assisted changes:** Improved missing-sequence reporting, added integration cases for deleting an interior or tail event, removed the unused redacted-payload field, and clarified the export verification limitation.
+- **AI-generated or AI-assisted changes:** Improved missing-sequence reporting, added integration cases for deleted events and payload canonicalization, removed the unused redacted-payload field, implemented signed export envelopes and signature tests, and updated the API, architecture, risk, scenario, and validation documentation.
 - **Human review:** The developer should review these changes and independently rerun the tests before submission.
-- **Rejected or modified suggestions:** A recipient-verifiable export redesign was not implemented; the privacy and trust-anchor design still needs to be selected and tested. The API documentation records the limitation.
+- **Rejected or modified suggestions:** The export is signed to detect changes after issue, but a Merkle inclusion proof was not added. Export redaction remains a view-level transformation; it does not erase stored values. The API documentation records both limitations.
 
 This record describes the actual development process. It does not claim that AI-generated code was automatically correct or that untested behavior works.
 

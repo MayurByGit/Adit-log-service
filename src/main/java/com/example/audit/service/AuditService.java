@@ -11,9 +11,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 public class AuditService {
@@ -44,8 +48,9 @@ public class AuditService {
                     .orElseThrow(() -> new IllegalStateException(
                             "Audit chain state is not initialized"));
 
+            JsonNode canonicalPayload = canonicalize(request.payload());
             String payloadJson =
-                    objectMapper.writeValueAsString(request.payload());
+                    objectMapper.writeValueAsString(canonicalPayload);
 
             long sequence = state.getLatestSequence() + 1L;
             String previousHash = state.getLatestHash();
@@ -99,5 +104,27 @@ public class AuditService {
             throw new IllegalStateException(
                     "Unable to create audit event", ex);
         }
+    }
+
+    private JsonNode canonicalize(JsonNode value) {
+        if (value instanceof ObjectNode source) {
+            ObjectNode canonical = objectMapper.createObjectNode();
+            List<String> names = new ArrayList<>(source.propertyNames());
+            names.sort(String::compareTo);
+            for (String name : names) {
+                canonical.set(name, canonicalize(source.get(name)));
+            }
+            return canonical;
+        }
+
+        if (value instanceof ArrayNode source) {
+            ArrayNode canonical = objectMapper.createArrayNode();
+            for (JsonNode child : source) {
+                canonical.add(canonicalize(child));
+            }
+            return canonical;
+        }
+
+        return value.deepCopy();
     }
 }
